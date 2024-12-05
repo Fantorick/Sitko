@@ -1,0 +1,178 @@
+﻿@using Sitko.Abstract
+@using Sitko.Services
+@inject ContentService contentService
+
+<h3>Список дел</h3>
+
+<form id="listForm" method="post">
+    <div>
+        <div class="header-component">
+            <input @bind-value="s" type="text" placeholder="Что добавить?" />
+            <button @onclick="AddLinesToForm">Добавить</button>
+            <button @onclick="DeleteSelected">Удалить выбранное</button>
+            <InputSelect @bind-Value="sort" @onclick="Sorting">
+                <option>Название</option>
+                <option>Дата создания</option>
+                <option>Дата выполнения</option>
+            </InputSelect>
+            <InputSelect @bind-Value="category" @onclick="ChoiceList">
+                <option>Все</option>
+                <option>Выполненные</option>
+                <option>Не выполненные</option>
+            </InputSelect>
+        </div>
+        <div class="main-component">
+            <table class="all-list">
+                <thead>
+                    <tr>
+                        <td></td>
+                        <td>Название</td>
+                        <td>Дата создания</td>
+                        <td>Дата выполнения</td>
+                        <td></td>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in lines)
+                    {
+                        <tr>
+                            @if (item.State == true)
+                            {
+                                <td>
+                                    <input @onchange="() => Update(item.Id)" checked type="checkbox" />
+                                </td>
+                            }
+                            else
+                            {
+                                <td>
+                                    <input @onchange="() => Update(item.Id)" type="checkbox" />
+                                </td>
+                            }
+                            <td>
+                                @item.Name
+                            </td>
+                            <td>
+                                @item.DateCreate
+                            </td>
+                            <td>
+                                @if (item.State == true)
+                                {
+                                    @item.DateDue
+                                }
+                            </td>
+                            <td>
+                                <button @onclick="() => DeleteLine(item.Id)">x</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="number-tasks">Количество не выполненных задач: @_repositoryLines.ReadList().Where(x => x.State == false).Count()</p>
+    </div>
+</form>
+@code {
+    private IRepository<LineModel> _repositoryLines;
+    List<LineModel> lines;
+
+    protected string s, sort, category;
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        sort = "Название";
+        category = "Все";
+        _repositoryLines = contentService.GetRepositoryLine();
+        lines = _repositoryLines.ReadList().OrderBy(x => x.Name).ToList();
+
+    }
+    public void AddLinesToForm()
+    {
+        _repositoryLines.Create(new LineModel()
+            {
+                DateCreate = DateTime.Now,
+                //DateDue = DateTime.Now,
+                Name = s
+            });
+
+        s = "";
+
+        ChoiceList();
+
+    }
+
+    protected void DeleteLine(long id)
+    {
+        _repositoryLines.Delete(id);
+        ChoiceList();
+    }
+    protected void DeleteSelected()
+    {
+        var a = _repositoryLines.ReadList().Where(x => x.State == true);
+        foreach (var item in a.ToList())
+        {
+            _repositoryLines.Delete(item.Id);
+        }
+        ChoiceList();
+    }
+    protected async void Update(long id)
+    {
+        var a = _repositoryLines.Read(id);
+        a.State = !a.State;
+        if (a.State == true)
+            a.DateDue = DateTime.Now;
+        else 
+            a.DateDue = DateTime.MinValue;
+        _repositoryLines.Update(a);
+        await Task.Yield();
+
+        ChoiceList();
+    }
+
+    protected void ChoiceList()
+    {
+        switch (category)
+        {
+            case "Все":
+                lines = _repositoryLines.ReadList().ToList();
+                Sorting();
+                break;
+            case "Выполненные":
+                lines = _repositoryLines.ReadList().Where(x => x.State == true).ToList();
+                break;
+            case "Не выполненные":
+                lines = _repositoryLines.ReadList().Where(x => x.State == false).ToList();
+                break;
+        }
+        Sorting();
+        StateHasChanged();
+    }
+    protected void Sorting()
+    {
+        switch (sort)
+        {
+            case "Название":
+                lines = lines.OrderBy(x => x.Name).ToList();//_repositoryItem.ReadList().OrderBy(x => x.Name).ToList();
+                break;
+            case "Дата создания":
+                lines = lines.OrderBy(x => x.DateCreate).Reverse().ToList();
+                break;
+            case "Дата выполнения":
+                lines = lines.OrderBy(x => x.DateDue).Reverse().ToList();
+                break;
+        }
+        StateHasChanged();
+    }
+}
+<script>
+    document.getElementById('listForm').addEventListener('submit', function (event) {
+        event.preventDefault();
+    });
+    $(document).ready(function () {
+        $("listForm").keydown(function (event) {
+            if (event.keyCode == 13) {
+                event.preventDefault();
+                return false;
+            }
+        });
+    });
+</script>

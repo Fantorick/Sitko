@@ -1,0 +1,6 @@
+﻿@using Sitko.Blazor
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+@(await Html.RenderComponentAsync<IndexComponent>(RenderMode.ServerPrerendered))
